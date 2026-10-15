@@ -718,15 +718,31 @@ class ScaledownExtractionMiddleware(AgentMiddleware):
             )
         if questions:
             answers = self.client.classify(text, questions).get("answers") or {}
-            decided = [
-                {
-                    "text": answer["choice"],
-                    "type": key,
-                    "confidence": answer.get("confidence"),
-                }
-                for key, answer in answers.items()
-                if isinstance(answer, dict) and answer.get("choice") is not None
-            ]
+            if not isinstance(answers, dict):
+                raise ScaledownAPIError(
+                    "ScaleDown classification answers must be an object"
+                )
+            decided = []
+            for key, answer in answers.items():
+                if key not in questions:
+                    continue
+                if not isinstance(answer, dict) or answer.get("choice") is None:
+                    continue
+                choice = answer["choice"]
+                if (
+                    not isinstance(choice, str)
+                    or choice not in questions[key]["criteria"]
+                ):
+                    raise ScaledownAPIError(
+                        "ScaleDown classification returned an unconfigured choice"
+                    )
+                decided.append(
+                    {
+                        "text": choice,
+                        "type": key,
+                        "confidence": answer.get("confidence"),
+                    }
+                )
             response = {
                 **response,
                 "entities": [*(response.get("entities") or []), *decided],
