@@ -107,12 +107,13 @@ class ScaledownClient:
         data = self._chat_task(
             "summarize", {"messages": messages, "max_tokens": max_tokens}
         )
-        try:
-            return str(data["summary"])
-        except KeyError as e:
+        summary = data.get("summary")
+        if not isinstance(summary, str) or not summary.strip():
             raise ScaledownAPIError(
-                "ScaleDown summarization response missing 'summary'"
-            ) from e
+                "ScaleDown summarization response must contain "
+                "a non-empty 'summary' string"
+            )
+        return summary
 
     def extract(
         self,
