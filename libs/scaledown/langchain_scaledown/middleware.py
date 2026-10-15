@@ -257,7 +257,13 @@ class ScaledownCompressionMiddleware(AgentMiddleware):
                 "ScaleDown compression unsuccessful; passing request through."
             )
             return request
-        return request.override(system_message=SystemMessage(content=compressed))
+        current = request.system_message
+        new = (
+            current.model_copy(update={"content": compressed})
+            if current is not None
+            else SystemMessage(content=compressed)
+        )
+        return request.override(system_message=new)
 
     def wrap_model_call(
         self,
@@ -800,10 +806,12 @@ class ScaledownExtractionMiddleware(AgentMiddleware):
         if current is None:
             new = SystemMessage(content=block)
         elif isinstance(current.content, str):
-            new = SystemMessage(content=f"{current.content}\n\n{block}")
+            new = current.model_copy(
+                update={"content": f"{current.content}\n\n{block}"}
+            )
         else:
-            new = SystemMessage(
-                content=[*current.content, {"type": "text", "text": block}]
+            new = current.model_copy(
+                update={"content": [*current.content, {"type": "text", "text": block}]}
             )
         return request.override(system_message=new)
 
